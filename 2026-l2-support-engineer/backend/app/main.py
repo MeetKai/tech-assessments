@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException
 from .auth import login, require_user
 from .data import CATEGORIES, DOCUMENTS
 from .search import search_documents
+from .limits import check_limit
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("portal")
@@ -54,6 +55,7 @@ def categories(user: str = Depends(require_user)):
 
 @app.get("/api/search")
 def search(request: Request, q: str = Query("", max_length=200), page: int = Query(1, ge=1), category: str = "", user: str = Depends(require_user)):
+    check_limit(request)
     return search_documents(q, page, category)
 
 @app.get("/api/documents/{document_id}")
