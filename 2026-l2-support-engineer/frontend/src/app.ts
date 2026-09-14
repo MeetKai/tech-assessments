@@ -27,6 +27,7 @@ export class KnowledgeApp extends LitElement {
   signingIn = false;
   selected: Document | null = null;
   status = 'Status desconhecido';
+  private healthTimer?: ReturnType<typeof setInterval>;
   private sequence = 0;
   private detailSequence = 0;
 
@@ -34,6 +35,18 @@ export class KnowledgeApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     if (this.token) void this.loadPortal();
+    void this.checkHealth();
+    this.healthTimer = setInterval(() => void this.checkHealth(), 15000);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    clearInterval(this.healthTimer);
+  }
+
+  private async checkHealth() {
+    try { await api('/health'); this.status = 'Operacional'; }
+    catch (error) { this.status = error instanceof ApiError && error.status >= 500 ? 'Instável' : 'Status desconhecido'; }
   }
 
   private showError(error: unknown) {
