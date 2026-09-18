@@ -1,2 +1,14 @@
 # Valores de produção do gateway.
 replicaCount: 2
+
+image:
+  pullPolicy: Always
+
+strategy:
+  type: Recreate
+
+extraEnv:
+  - name: LOG_LEVEL
+    value: info
+  - name: GATEWAY_ADMIN_TOKEN
+    value: "mk-adm-7c41e9b20f5d4a83"

@@ -6,6 +6,25 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+strategy:
+  type: RollingUpdate
+
+credentials:
+  secretName: gateway-credentials
+  key: api-token
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: /readyz
+    periodSeconds: 5
+
+extraEnv: []
+
 service:
   port: 8080
 
