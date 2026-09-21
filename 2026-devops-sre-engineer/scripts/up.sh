@@ -29,7 +29,7 @@ kubectl --context "$CTX" apply -f platform/namespace.yaml >/dev/null
 # sincronizado a partir do cofre e não é editado à mão.
 if ! kubectl --context "$CTX" -n "$NS" get secret gateway-credentials >/dev/null 2>&1; then
   kubectl --context "$CTX" -n "$NS" create secret generic gateway-credentials \
-    --from-literal=GATEWAY_API_TOKEN="demo-$(openssl rand -hex 12)" >/dev/null
+    --from-literal=GATEWAY_API_TOKEN="demo-$(LC_ALL=C tr -dc a-f0-9 </dev/urandom | head -c 24)" >/dev/null
 fi
 
 if ! helm status gateway --kube-context "$CTX" -n "$NS" >/dev/null 2>&1; then
