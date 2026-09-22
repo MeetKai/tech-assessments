@@ -31,7 +31,9 @@ Se você não usa chave SSH, clone por HTTPS:
 git clone https://github.com/MeetKai/tech-assessments.git
 ```
 
-Abra **http://127.0.0.1:5173**. O comando instala as dependências e inicia a API e a interface. As portas 5173 e 8000 precisam estar livres. Use Ctrl+C para encerrar os dois serviços. Após editar o backend, reinicie `make dev`; o frontend atualiza automaticamente.
+Espere a mensagem **Portal: http://127.0.0.1:5173** e abra esse endereço. Ela aparece depois que a API e a interface iniciam. O comando prepara as dependências e reutiliza a instalação do frontend enquanto os arquivos de dependências não mudarem. Você também pode executar `make dev` na raiz do repositório.
+
+As portas 5173 e 8000 precisam estar livres. Use Ctrl+C uma vez e aguarde o encerramento dos dois serviços, que pode levar até três segundos. Após editar o backend, reinicie `make dev`; o frontend atualiza automaticamente. Se uma porta estiver ocupada, use `lsof -nP -iTCP:5173 -sTCP:LISTEN` ou o mesmo comando com `8000` para identificar o processo antes de encerrá-lo.
 
 | Campo | Valor de demonstração |
 | --- | --- |
