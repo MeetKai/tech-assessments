@@ -15,7 +15,7 @@ from .limits import check_limit
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("portal")
-app = FastAPI(title="Base de Conhecimento", version="1.3.0")
+app = FastAPI(title="Base de Conhecimento", version="1.4.0")
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
