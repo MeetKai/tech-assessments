@@ -1,0 +1,25 @@
+# Testes das regras com promtool. Rode com `make alerts-test`.
+# Referência do formato:
+# https://prometheus.io/docs/prometheus/latest/configuration/unit_testing_rules/
+rule_files:
+  - gateway-slo.rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: tráfego saudável não dispara alertas
+    interval: 1m
+    input_series:
+      # 1.000 requisições por minuto com sucesso.
+      - series: 'http_requests_total{job="gateway",route="/v1/generate",code="200"}'
+        values: '0+1000x480'
+      # Meia requisição com erro por minuto (0,05%), dentro do SLO.
+      - series: 'http_requests_total{job="gateway",route="/v1/generate",code="500"}'
+        values: '0+0.5x480'
+    alert_rule_test:
+      - eval_time: 8h
+        alertname: GatewayErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 8h
+        alertname: GatewayErrorBudgetSlowBurn
+        exp_alerts: []
