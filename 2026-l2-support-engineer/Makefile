@@ -2,9 +2,12 @@
 dev:
 	uv run --python 3.12 --no-project scripts/dev.py
 
-test:
-	cd backend && uv sync --frozen && uv run --frozen pytest
-	cd frontend && npm ci --no-audit --no-fund && npm test
+frontend/node_modules/.package-lock.json: frontend/package-lock.json frontend/package.json
+	cd frontend && npm ci --no-audit --no-fund
 
-build:
-	cd frontend && npm ci --no-audit --no-fund && npm run build
+test: frontend/node_modules/.package-lock.json
+	cd backend && uv sync --frozen && uv run --frozen pytest
+	cd frontend && npm test
+
+build: frontend/node_modules/.package-lock.json
+	cd frontend && npm run build
