@@ -1,12 +1,23 @@
 import os
 from pathlib import Path
+import hashlib
 import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def environment_path():
+    repository_key = hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:12]
+    return Path(tempfile.gettempdir()) / "meetkai-base-conhecimento" / repository_key / "venv"
+
+
+def bytecode_path():
+    return environment_path().parent / "pycache"
 
 
 def check_port(port):
@@ -46,15 +57,15 @@ def main():
         nonlocal stopping
         stopping = True
 
-    def start(command, cwd):
+    def start(command, cwd, env=None):
         if stopping:
             raise InterruptedError
-        process = subprocess.Popen(command, cwd=cwd, start_new_session=True)
+        process = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True)
         processes.append(process)
         return process
 
-    def install(command, cwd):
-        process = start(command, cwd)
+    def install(command, cwd, env=None):
+        process = start(command, cwd, env=env)
         while process.poll() is None:
             if stopping:
                 raise InterruptedError
@@ -88,7 +99,9 @@ def main():
     previous_handlers = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
         print("Preparando dependências…", flush=True)
-        install(["uv", "sync", "--frozen"], ROOT / "backend")
+        python_environment = environment_path()
+        uv_environment = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(python_environment)}
+        install(["uv", "sync", "--frozen"], ROOT / "backend", uv_environment)
         frontend = ROOT / "frontend"
         installed = frontend / "node_modules/.package-lock.json"
         vite = frontend / "node_modules/vite/bin/vite.js"
@@ -97,7 +110,8 @@ def main():
                     for name in ("package.json", "package-lock.json"))):
             install(["npm", "ci", "--no-audit", "--no-fund"], frontend)
         print("Iniciando API…", flush=True)
-        start([str(ROOT / "backend/.venv/bin/python"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], ROOT / "backend")
+        api_environment = {**os.environ, "PYTHONPYCACHEPREFIX": str(bytecode_path())}
+        start([str(python_environment / "bin/python"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], ROOT / "backend", api_environment)
         wait_ready(8000)
         print("Iniciando interface…", flush=True)
         start(["node", str(vite), "--host", "127.0.0.1", "--port", "5173", "--strictPort"], frontend)

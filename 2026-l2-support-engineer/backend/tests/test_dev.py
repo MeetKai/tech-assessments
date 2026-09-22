@@ -80,3 +80,19 @@ def test_root_make_forwards_dev_to_assessment():
     result = subprocess.run(["make", "-n", "dev"], cwd=root, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     assert "2026-l2-support-engineer" in result.stdout
+
+
+def test_environment_lives_outside_document_workspace():
+    import tempfile
+
+    environment = dev.environment_path()
+    assert environment.is_relative_to(Path(tempfile.gettempdir()))
+    assert not environment.is_relative_to(dev.ROOT)
+
+
+def test_python_bytecode_lives_outside_document_workspace():
+    import tempfile
+
+    cache = dev.bytecode_path()
+    assert cache.is_relative_to(Path(tempfile.gettempdir()))
+    assert not cache.is_relative_to(dev.ROOT)
