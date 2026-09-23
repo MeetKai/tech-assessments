@@ -96,3 +96,37 @@ def test_python_bytecode_lives_outside_document_workspace():
     cache = dev.bytecode_path()
     assert cache.is_relative_to(Path(tempfile.gettempdir()))
     assert not cache.is_relative_to(dev.ROOT)
+
+
+def test_frontend_source_sync_updates_files_without_copying_dependencies(tmp_path):
+    source = tmp_path / "source"
+    target = tmp_path / "cache"
+    (source / "src").mkdir(parents=True)
+    (source / "node_modules").mkdir()
+    (source / "src/app.ts").write_text("primeira versão")
+    (source / "node_modules/do-not-copy").write_text("dependência")
+    (source / "index.html").write_text("<html lang='pt-BR'></html>")
+
+    dev.sync_frontend(source, target)
+    assert (target / "src/app.ts").read_text() == "primeira versão"
+    assert (target / "index.html").exists()
+    assert not (target / "node_modules").exists()
+
+    (target / "node_modules").mkdir()
+    (target / "node_modules/keep").write_text("instalada")
+    (source / "src/app.ts").write_text("segunda versão com mudança")
+    dev.sync_frontend(source, target)
+    assert (target / "src/app.ts").read_text() == "segunda versão com mudança"
+    assert (target / "node_modules/keep").read_text() == "instalada"
+
+    (source / "src/app.ts").unlink()
+    dev.sync_frontend(source, target)
+    assert not (target / "src/app.ts").exists()
+
+
+def test_frontend_cache_is_outside_document_workspace():
+    import tempfile
+
+    cache = dev.frontend_cache_path()
+    assert cache.is_relative_to(Path(tempfile.gettempdir()))
+    assert not cache.is_relative_to(dev.ROOT)

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import hashlib
+import shutil
 import signal
 import socket
 import subprocess
@@ -18,6 +19,32 @@ def environment_path():
 
 def bytecode_path():
     return environment_path().parent / "pycache"
+
+
+def frontend_cache_path():
+    return environment_path().parent / "frontend"
+
+
+def sync_frontend(source, target):
+    source = Path(source)
+    target = Path(target)
+    paths = [name for name in ("index.html", "vite.config.ts", "tsconfig.json", "package.json", "package-lock.json") if (source / name).is_file()]
+    for folder in ("src", "public"):
+        if (source / folder).exists():
+            paths.extend(path.relative_to(source) for path in (source / folder).rglob("*") if path.is_file())
+    for relative in paths:
+        original = source / relative
+        cached = target / relative
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        if (not cached.exists() or cached.stat().st_mtime_ns != original.stat().st_mtime_ns or
+                cached.stat().st_size != original.stat().st_size):
+            shutil.copy2(original, cached)
+    for folder in ("src", "public"):
+        cached_folder = target / folder
+        if cached_folder.exists():
+            for cached in cached_folder.rglob("*"):
+                if cached.is_file() and cached.relative_to(target) not in paths:
+                    cached.unlink()
 
 
 def check_port(port):
@@ -49,7 +76,7 @@ def stop_processes(processes, timeout=3):
         process.wait()
 
 
-def main():
+def main(frontend_only=False):
     processes = []
     stopping = False
 
@@ -90,7 +117,7 @@ def main():
                 time.sleep(.1)
         raise RuntimeError(f"O serviço na porta {port} não iniciou em 60 segundos.")
 
-    for port in (8000, 5173):
+    for port in ((5173,) if frontend_only else (8000, 5173)):
         try:
             check_port(port)
         except OSError as error:
@@ -98,26 +125,39 @@ def main():
             return 1
     previous_handlers = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        print("Preparando dependências…", flush=True)
-        python_environment = environment_path()
-        uv_environment = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(python_environment)}
-        install(["uv", "sync", "--frozen"], ROOT / "backend", uv_environment)
+        if not frontend_only:
+            print("Preparando dependências…", flush=True)
+            python_environment = environment_path()
+            uv_environment = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(python_environment)}
+            install(["uv", "sync", "--frozen"], ROOT / "backend", uv_environment)
         frontend = ROOT / "frontend"
-        installed = frontend / "node_modules/.package-lock.json"
-        vite = frontend / "node_modules/vite/bin/vite.js"
-        if (not installed.exists() or not vite.exists() or
-                any((frontend / name).stat().st_mtime > installed.stat().st_mtime
-                    for name in ("package.json", "package-lock.json"))):
-            install(["npm", "ci", "--no-audit", "--no-fund"], frontend)
-        print("Iniciando API…", flush=True)
-        api_environment = {**os.environ, "PYTHONPYCACHEPREFIX": str(bytecode_path())}
-        start([str(python_environment / "bin/python"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], ROOT / "backend", api_environment)
-        wait_ready(8000)
+        frontend_cache = frontend_cache_path()
+        print("Preparando interface…", flush=True)
+        sync_frontend(frontend, frontend_cache)
+        dependency_hash = hashlib.sha256(
+            (frontend_cache / "package.json").read_bytes() +
+            (frontend_cache / "package-lock.json").read_bytes()
+        ).hexdigest()
+        marker = frontend_cache / ".meetkai-dependencies"
+        vite = frontend_cache / "node_modules/vite/bin/vite.js"
+        if not vite.exists() or not marker.exists() or marker.read_text() != dependency_hash:
+            install(["npm", "ci", "--no-audit", "--no-fund"], frontend_cache)
+            marker.write_text(dependency_hash)
+        if not frontend_only:
+            print("Iniciando API…", flush=True)
+            api_environment = {**os.environ, "PYTHONPYCACHEPREFIX": str(bytecode_path())}
+            start([str(python_environment / "bin/python"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], ROOT / "backend", api_environment)
+            wait_ready(8000)
         print("Iniciando interface…", flush=True)
-        start(["node", str(vite), "--host", "127.0.0.1", "--port", "5173", "--strictPort"], frontend)
+        start(["node", str(vite), "--host", "127.0.0.1", "--port", "5173", "--strictPort"], frontend_cache)
         wait_ready(5173)
-        print("Portal: http://127.0.0.1:5173 · Ctrl+C para encerrar", flush=True)
+        label = "Interface" if frontend_only else "Portal"
+        print(f"{label}: http://127.0.0.1:5173 · Ctrl+C para encerrar", flush=True)
+        next_sync = time.monotonic()
         while not stopping and all(p.poll() is None for p in processes):
+            if time.monotonic() >= next_sync:
+                sync_frontend(frontend, frontend_cache)
+                next_sync = time.monotonic() + 1
             time.sleep(.2)
         if stopping:
             return 0
@@ -134,4 +174,6 @@ def main():
             signal.signal(sig, handler)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    if sys.argv[1:] not in ([], ["--frontend-only"]):
+        sys.exit("Uso: python3 scripts/dev.py [--frontend-only]")
+    sys.exit(main(frontend_only=sys.argv[1:] == ["--frontend-only"]))
