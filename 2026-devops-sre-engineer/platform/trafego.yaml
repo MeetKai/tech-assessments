@@ -1,0 +1,33 @@
+# Gerador de tráfego sintético. Simula clientes chamando a API de geração
+# e registra o resultado de cada chamada nos logs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trafego
+  namespace: gateway
+  labels:
+    app.kubernetes.io/name: trafego
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trafego
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trafego
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: trafego
+          image: registry.interno.meetkai.local/plataforma/gateway:1.3.0
+          imagePullPolicy: IfNotPresent
+          args: ["--traffic", "http://gateway:8080/v1/generate", "--interval", "1"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi

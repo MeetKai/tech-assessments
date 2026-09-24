@@ -1,0 +1,5 @@
+# Regras de alerta do SLO de disponibilidade do gateway.
+# A especificação está na seção "Alertas de SLO" do README.
+groups:
+  - name: gateway-slo
+    rules: []

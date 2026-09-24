@@ -1,0 +1,36 @@
+replicaCount: 2
+
+image:
+  repository: registry.interno.meetkai.local/plataforma/gateway
+  # Vazio usa o appVersion do chart.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+strategy:
+  type: RollingUpdate
+
+credentials:
+  secretName: gateway-credentials
+  key: api-token
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: /readyz
+    periodSeconds: 5
+
+extraEnv: []
+
+service:
+  port: 8080
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
